@@ -1,0 +1,94 @@
+<script>
+(function(){
+    const STORE_KEY = 'tc_col_order';
+    const thead = document.querySelector('table thead tr');
+    if (!thead) return;
+
+    const ths = Array.from(thead.querySelectorAll('th'));
+
+    // ── 저장된 순서 복원 ──────────────────────────
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved) {
+        try {
+            const order = JSON.parse(saved); // [0,3,1,2,...] 인덱스 배열
+            const tbody = document.querySelector('table tbody');
+            const allRows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+
+            order.forEach(origIdx => {
+                const th = ths.find(t => t.dataset.colIdx == origIdx);
+                if (th) thead.appendChild(th);
+            });
+
+            // tbody 각 행도 같은 순서로 재배치
+            allRows.forEach(row => {
+                const tds = Array.from(row.querySelectorAll('td'));
+                order.forEach(origIdx => {
+                    if (tds[origIdx]) row.appendChild(tds[origIdx]);
+                });
+            });
+        } catch(e) { localStorage.removeItem(STORE_KEY); }
+    }
+
+    // ── 각 th에 index 부여 + draggable 속성 ──────
+    Array.from(thead.querySelectorAll('th')).forEach((th, i) => {
+        if (!th.dataset.colIdx) th.dataset.colIdx = i;
+        th.draggable = true;
+
+        th.addEventListener('dragstart', e => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', th.dataset.colIdx);
+            th.classList.add('dragging');
+        });
+        th.addEventListener('dragend', () => {
+            th.classList.remove('dragging');
+            document.querySelectorAll('th.drag-over')
+                    .forEach(el => el.classList.remove('drag-over'));
+        });
+        th.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            th.classList.add('drag-over');
+        });
+        th.addEventListener('dragleave', () => {
+            th.classList.remove('drag-over');
+        });
+        th.addEventListener('drop', e => {
+            e.preventDefault();
+            th.classList.remove('drag-over');
+            const fromIdx = e.dataTransfer.getData('text/plain');
+            const toIdx   = th.dataset.colIdx;
+            if (fromIdx === toIdx) return;
+
+            const fromTh = Array.from(thead.querySelectorAll('th'))
+                                .find(t => t.dataset.colIdx == fromIdx);
+            if (!fromTh) return;
+
+            // 헤더 이동
+            thead.insertBefore(fromTh, th);
+
+            // tbody 각 행도 동일하게 이동
+            const tbody = document.querySelector('table tbody');
+            if (tbody) {
+                tbody.querySelectorAll('tr').forEach(row => {
+                    const tds  = Array.from(row.querySelectorAll('td'));
+                    const from = tds.find(td => td.dataset.colIdx == fromIdx);
+                    const to   = tds.find(td => td.dataset.colIdx == toIdx);
+                    if (from && to) row.insertBefore(from, to);
+                });
+            }
+
+            // 순서 저장
+            const newOrder = Array.from(thead.querySelectorAll('th'))
+                                  .map(t => parseInt(t.dataset.colIdx));
+            localStorage.setItem(STORE_KEY, JSON.stringify(newOrder));
+        });
+    });
+
+    // td에도 colIdx 부여 (tbody 재정렬용)
+    document.querySelectorAll('table tbody tr').forEach(row => {
+        Array.from(row.querySelectorAll('td')).forEach((td, i) => {
+            td.dataset.colIdx = i;
+        });
+    });
+})();
+</script>
