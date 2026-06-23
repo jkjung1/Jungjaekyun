@@ -383,6 +383,54 @@
         // 순서 복원 완료 후 테이블 표시
         table.classList.add('col-ready');
 
+        // ── 컬럼 너비 조절 ──────────────────────────────
+        const WIDTH_KEY = 'tc_col_widths';
+
+        // 저장된 너비 복원
+        const savedWidths = localStorage.getItem(WIDTH_KEY);
+        if (savedWidths) {
+            try {
+                const widths = JSON.parse(savedWidths);
+                Array.from(thead.querySelectorAll('th')).forEach((th, i) => {
+                    if (widths[i]) th.style.width = widths[i] + 'px';
+                });
+            } catch(e) { localStorage.removeItem(WIDTH_KEY); }
+        }
+
+        // 각 th에 리사이즈 핸들 추가
+        Array.from(thead.querySelectorAll('th')).forEach((th) => {
+            const handle = document.createElement('div');
+            handle.className = 'resize-handle';
+            th.appendChild(handle);
+
+            let startX, startW;
+
+            handle.addEventListener('mousedown', e => {
+                e.stopPropagation(); // 드래그앤드롭과 충돌 방지
+                e.preventDefault();
+                startX = e.pageX;
+                startW = th.offsetWidth;
+                handle.classList.add('resizing');
+
+                const onMove = e => {
+                    const newW = Math.max(50, startW + (e.pageX - startX));
+                    th.style.width = newW + 'px';
+                };
+                const onUp = () => {
+                    handle.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+
+                    // 너비 저장
+                    const widths = Array.from(thead.querySelectorAll('th'))
+                                        .map(t => t.offsetWidth);
+                    localStorage.setItem(WIDTH_KEY, JSON.stringify(widths));
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
         // SortableJS 적용
         Sortable.create(thead, {
             animation: 150,          // 이동 애니메이션 속도 (ms)
@@ -417,8 +465,23 @@
 .col-chosen  { cursor: grabbing; }
 .col-drag    { background:#1428A0 !important; color:#fff !important;
                opacity:0.85; border-radius:6px; box-shadow:0 4px 16px rgba(20,40,160,0.25); }
-.table-wrap table { visibility: hidden; }
+.table-wrap table { visibility: hidden !important; }
 .table-wrap table.col-ready { visibility: visible; transition: opacity 0.15s ease; }
+
+/* 너비 조절 */
+.table-wrap table { table-layout: fixed; }
+.resize-handle {
+    position: absolute; right: 0; top: 0;
+    width: 6px; height: 100%;
+    cursor: col-resize;
+    user-select: none;
+    z-index: 1;
+}
+.resize-handle:hover, .resize-handle.resizing {
+    background: #1428A0;
+    opacity: 0.5;
+}
+thead tr th { position: relative; }
 </style>
 
 {% endblock %}
