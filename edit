@@ -54,11 +54,6 @@
     vertical-align: middle;
 }
 .sort-icon.active { color: #1428A0; font-weight:900; }
-
-/* 드래그앤드롭 헤더 */
-.sort-th[draggable] { cursor: grab; }
-.sort-th.drag-over  { background:#C5CAE9 !important; outline:2px dashed #1428A0; }
-.sort-th.dragging   { opacity:0.4; }
 </style>
 {% endblock %}
 
@@ -342,79 +337,10 @@
 </div>
 {% endif %}
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 (function(){
     const STORE_KEY = 'tc_col_order';
-
-    function applySwap(thead, fromIdx, toIdx) {
-        // ── 헤더 swap ──
-        const ths    = Array.from(thead.querySelectorAll('th'));
-        const fromTh = ths.find(t => t.dataset.colIdx == fromIdx);
-        const toTh   = ths.find(t => t.dataset.colIdx == toIdx);
-        if (!fromTh || !toTh) return;
-
-        const fromNext = fromTh.nextSibling;
-        thead.insertBefore(fromTh, toTh);
-        if (fromNext) thead.insertBefore(toTh, fromNext);
-        else thead.appendChild(toTh);
-
-        // ── tbody 각 행 swap ──
-        const tbody = document.querySelector('table tbody');
-        if (tbody) {
-            tbody.querySelectorAll('tr').forEach(row => {
-                const tds    = Array.from(row.querySelectorAll('td'));
-                const fromTd = tds.find(td => td.dataset.colIdx == fromIdx);
-                const toTd   = tds.find(td => td.dataset.colIdx == toIdx);
-                if (!fromTd || !toTd) return;
-                const fromTdNext = fromTd.nextSibling;
-                row.insertBefore(fromTd, toTd);
-                if (fromTdNext) row.insertBefore(toTd, fromTdNext);
-                else row.appendChild(toTd);
-            });
-        }
-    }
-
-    function saveOrder(thead) {
-        const order = Array.from(thead.querySelectorAll('th'))
-                           .map(t => parseInt(t.dataset.colIdx));
-        localStorage.setItem(STORE_KEY, JSON.stringify(order));
-    }
-
-    function initDrag(thead) {
-        thead.querySelectorAll('th').forEach(th => {
-            th.draggable = true;
-
-            th.addEventListener('dragstart', e => {
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', th.dataset.colIdx);
-                setTimeout(() => th.classList.add('dragging'), 0);
-            });
-            th.addEventListener('dragend', () => {
-                th.classList.remove('dragging');
-                thead.querySelectorAll('th.drag-over')
-                     .forEach(el => el.classList.remove('drag-over'));
-            });
-            th.addEventListener('dragover', e => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                thead.querySelectorAll('th.drag-over')
-                     .forEach(el => el.classList.remove('drag-over'));
-                th.classList.add('drag-over');
-            });
-            th.addEventListener('dragleave', () => {
-                th.classList.remove('drag-over');
-            });
-            th.addEventListener('drop', e => {
-                e.preventDefault();
-                th.classList.remove('drag-over');
-                const fromIdx = e.dataTransfer.getData('text/plain');
-                const toIdx   = th.dataset.colIdx;
-                if (fromIdx === toIdx) return;
-                applySwap(thead, fromIdx, toIdx);
-                saveOrder(thead);
-            });
-        });
-    }
 
     window.addEventListener('DOMContentLoaded', () => {
         const table = document.querySelector('table');
@@ -424,9 +350,13 @@
         const tbody = table.querySelector('tbody');
 
         // th, td 에 원본 인덱스 부여
-        thead.querySelectorAll('th').forEach((th, i) => { th.dataset.colIdx = i; });
+        Array.from(thead.querySelectorAll('th')).forEach((th, i) => {
+            th.dataset.colIdx = i;
+        });
         tbody && tbody.querySelectorAll('tr').forEach(row => {
-            row.querySelectorAll('td').forEach((td, i) => { td.dataset.colIdx = i; });
+            Array.from(row.querySelectorAll('td')).forEach((td, i) => {
+                td.dataset.colIdx = i;
+            });
         });
 
         // 저장된 순서 복원
@@ -435,7 +365,6 @@
             try {
                 const order = JSON.parse(saved);
                 const currentThs = Array.from(thead.querySelectorAll('th'));
-                // 현재 컬럼 수와 저장된 순서 수가 다르면 무시
                 if (order.length === currentThs.length) {
                     order.forEach(origIdx => {
                         const th = thead.querySelector(`th[data-col-idx="${origIdx}"]`);
@@ -451,10 +380,45 @@
             } catch(e) { localStorage.removeItem(STORE_KEY); }
         }
 
-        initDrag(thead);
+        // 순서 복원 완료 후 테이블 표시
+        table.classList.add('col-ready');
+
+        // SortableJS 적용
+        Sortable.create(thead, {
+            animation: 150,          // 이동 애니메이션 속도 (ms)
+            easing: 'cubic-bezier(0.25, 1, 0.5, 1)',  // 물 흐르는 easing
+            ghostClass: 'col-ghost', // 드래그 중 원래 자리 스타일
+            chosenClass: 'col-chosen', // 잡고있는 항목 스타일
+            dragClass: 'col-drag',   // 실제 드래그 중인 항목 스타일
+            onEnd(evt) {
+                if (evt.oldIndex === evt.newIndex) return;
+
+                // tbody 각 행도 동일하게 이동
+                tbody && tbody.querySelectorAll('tr').forEach(row => {
+                    const tds = Array.from(row.querySelectorAll('td'));
+                    if (evt.oldIndex < evt.newIndex) {
+                        tds[evt.newIndex].after(tds[evt.oldIndex]);
+                    } else {
+                        tds[evt.newIndex].before(tds[evt.oldIndex]);
+                    }
+                });
+
+                // 순서 저장
+                const order = Array.from(thead.querySelectorAll('th'))
+                                   .map(t => parseInt(t.dataset.colIdx));
+                localStorage.setItem(STORE_KEY, JSON.stringify(order));
+            }
+        });
     });
 })();
 </script>
+<style>
+.col-ghost   { opacity:0.3; background:#C5CAE9 !important; }
+.col-chosen  { cursor: grabbing; }
+.col-drag    { background:#1428A0 !important; color:#fff !important;
+               opacity:0.85; border-radius:6px; box-shadow:0 4px 16px rgba(20,40,160,0.25); }
+.table-wrap table { visibility: hidden; }
+.table-wrap table.col-ready { visibility: visible; transition: opacity 0.15s ease; }
+</style>
 
 {% endblock %}
-
