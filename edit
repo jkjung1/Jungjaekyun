@@ -412,6 +412,11 @@
                 startW = th.offsetWidth;
                 handle.classList.add('resizing');
 
+                // 드래그 중엔 transition 끄기 (버벅임 방지)
+                table.querySelectorAll('th, td').forEach(el => {
+                    el.style.transition = 'none';
+                });
+
                 const onMove = e => {
                     const newW = Math.max(50, startW + (e.pageX - startX));
                     th.style.width = newW + 'px';
@@ -420,6 +425,11 @@
                     handle.classList.remove('resizing');
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
+
+                    // 드래그 끝나면 transition 다시 켜서 부드럽게 마무리
+                    table.querySelectorAll('th, td').forEach(el => {
+                        el.style.transition = '';
+                    });
 
                     // 너비 저장
                     const widths = Array.from(thead.querySelectorAll('th'))
@@ -465,7 +475,7 @@
 .col-chosen  { cursor: grabbing; }
 .col-drag    { background:#1428A0 !important; color:#fff !important;
                opacity:0.85; border-radius:6px; box-shadow:0 4px 16px rgba(20,40,160,0.25); }
-.table-wrap table { visibility: hidden !important; }
+.table-wrap table { visibility: hidden; }
 .table-wrap table.col-ready { visibility: visible; transition: opacity 0.15s ease; }
 
 /* 너비 조절 */
@@ -481,7 +491,16 @@
     background: #1428A0;
     opacity: 0.5;
 }
-thead tr th { position: relative; }
+thead tr th {
+    position: relative;
+    transition: width 0.15s ease;
+}
+tbody tr td {
+    transition: width 0.15s ease;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 </style>
 
 {% endblock %}
