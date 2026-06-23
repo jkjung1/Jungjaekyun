@@ -412,32 +412,40 @@
                 startW = th.offsetWidth;
                 handle.classList.add('resizing');
 
-                // 드래그 중엔 transition 끄기 (버벅임 방지)
-                table.querySelectorAll('th, td').forEach(el => {
+                // 드래그 중엔 th transition만 끄기
+                table.querySelectorAll('th').forEach(el => {
                     el.style.transition = 'none';
                 });
 
                 const onMove = e => {
                     const newW = Math.max(50, startW + (e.pageX - startX));
                     th.style.width = newW + 'px';
+                    th.style.minWidth = newW + 'px';
+                    // td는 드래그 중 건드리지 않음
                 };
                 const onUp = () => {
                     handle.classList.remove('resizing');
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
 
-                    // 드래그 끝나면 th transition 다시 켜기
+                    // th transition 다시 켜기
                     table.querySelectorAll('th').forEach(el => {
                         el.style.transition = '';
                     });
 
-                    // td 너비를 th에 맞춰 즉시 반영
+                    // 드롭 후 td 너비를 th에 맞춰 즉시(transition 없이) 반영
                     const thList = Array.from(thead.querySelectorAll('th'));
                     thList.forEach((t, i) => {
                         const w = t.offsetWidth + 'px';
                         tbody && tbody.querySelectorAll('tr').forEach(row => {
                             const td = row.querySelectorAll('td')[i];
-                            if (td) td.style.width = w;
+                            if (td) {
+                                td.style.transition = 'none';
+                                td.style.width = w;
+                                td.style.minWidth = w;
+                                // 한 프레임 뒤 transition 원복
+                                requestAnimationFrame(() => { td.style.transition = ''; });
+                            }
                         });
                     });
 
@@ -488,7 +496,6 @@
 .table-wrap table.col-ready { visibility: visible; transition: opacity 0.15s ease; }
 
 /* 너비 조절 */
-.table-wrap table { table-layout: fixed; }
 .resize-handle {
     position: absolute; right: 0; top: 0;
     width: 6px; height: 100%;
