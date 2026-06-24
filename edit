@@ -99,13 +99,11 @@
 <div class="card">
     <div class="card-header" style="flex-wrap:wrap;gap:10px;">
         <!-- 필터 -->
-        <form method="GET" class="filter-bar" style="flex:1;" id="filter-form">
-            <!-- 정렬 파라미터 유지 -->
-            <input type="hidden" name="sort" value="{{ sort_col }}">
-            <input type="hidden" name="dir"  value="{{ sort_dir }}">
-            <input type="hidden" name="alm_status" value="{{ alm_status_filter }}">
+        <div class="filter-bar" style="flex:1;" id="filter-form">
+            <input type="hidden" id="f-sort" value="{{ sort_col }}">
+            <input type="hidden" id="f-dir"  value="{{ sort_dir }}">
 
-            <select name="project_id" onchange="this.form.submit()">
+            <select id="f-project" onchange="fetchList()">
                 <option value="">📁 전체 프로젝트</option>
                 {% for p in projects %}
                 <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>
@@ -114,8 +112,7 @@
                 {% endfor %}
             </select>
 
-            <!-- ALM TC 상태 필터 -->
-            <select name="alm_status" onchange="this.form.submit()">
+            <select id="f-alm-status" onchange="fetchList()">
                 <option value="">📌 ALM상태</option>
                 {% for st in alm_status_list %}
                 <option value="{{ st }}" {% if alm_status_filter == st %}selected{% endif %}>
@@ -124,7 +121,7 @@
                 {% endfor %}
             </select>
 
-            <select name="status" onchange="this.form.submit()">
+            <select id="f-status" onchange="fetchList()">
                 <option value="">🔘 리뷰상태</option>
                 {% for st in STATUS_LIST %}
                 <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>
@@ -133,7 +130,7 @@
                 {% endfor %}
             </select>
 
-            <select name="domain" onchange="this.form.submit()">
+            <select id="f-domain" onchange="fetchList()">
                 <option value="">🏷️ Domain</option>
                 {% for d in domain_list %}
                 <option value="{{ d }}" {% if domain_filter == d %}selected{% endif %}>
@@ -141,14 +138,14 @@
                 </option>
                 {% endfor %}
             </select>
-            <input type="text" name="q" value="{{ keyword }}"
+
+            <input type="text" id="f-keyword" value="{{ keyword }}"
                    placeholder="🔍 TC ID / SITL-ID / 제목 / SubSystem 검색"
-                   style="min-width:220px;">
-            <button type="submit" class="btn btn-primary btn-sm">검색</button>
-            {% if keyword or status_filter or selected_project or domain_filter or alm_status_filter %}
-            <a href="{{ url_for('review.list_tc') }}" class="btn btn-secondary btn-sm">초기화</a>
-            {% endif %}
-        </form>
+                   style="min-width:220px;"
+                   onkeydown="if(event.key==='Enter') fetchList()">
+            <button class="btn btn-primary btn-sm" onclick="fetchList()">검색</button>
+            <button class="btn btn-secondary btn-sm" onclick="resetFilter()">초기화</button>
+        </div>
 
         <div style="display:flex;gap:8px;margin-left:auto;">
             {% if session.role == 'admin' %}
@@ -173,38 +170,38 @@
         <table>
             <thead>
                 <tr>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('project_name')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('project_name')">
                         프로젝트{{ sort_icon('project_name') }}
                     </th>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('tc_id')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('tc_id')">
                         TC ID{{ sort_icon('tc_id') }}
                     </th>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('sub_system')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('sub_system')">
                         Sub System{{ sort_icon('sub_system') }}
                     </th>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('ip')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('ip')">
                         IP{{ sort_icon('ip') }}
                     </th>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('sitl_id')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('sitl_id')">
                         SITL-ID{{ sort_icon('sitl_id') }}
                     </th>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('title')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('title')">
                         제목{{ sort_icon('title') }}
                     </th>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('domain')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('domain')">
                         Domain{{ sort_icon('domain') }}
                     </th>
-                    <th class="sort-th" onclick="location.href='{{ sort_url('alm_status')|trim }}'">
+                    <th class="sort-th" onclick="fetchSort('alm_status')">
                         ALM TC 상태{{ sort_icon('alm_status') }}
                     </th>
                     <th class="sort-th" style="text-align:center; min-width:160px;"
-                        onclick="location.href='{{ sort_url('overall_status')|trim }}'">
+                        onclick="fetchSort('overall_status')">
                         전체상태 / 보드별{{ sort_icon('overall_status') }}
                     </th>
                     <th style="text-align:center;">상세</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="tc-tbody">
                 {% for tc in tc_list %}
                 {% set board_statuses = board_status_map.get(tc.id, []) %}
                 <tr>
@@ -337,12 +334,121 @@
 </div>
 {% endif %}
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='js/Sortable.min.js') }}"></script>
+<script>
+// ── 비동기 필터/정렬 ─────────────────────────────
+const STATUS_BADGE = {
+    'Draft':        ['badge-draft',      '⬜'],
+    'In Review':    ['badge-inreview',   '🔵'],
+    'BL in Review': ['badge-blinreview', '🟡'],
+    'Reviewed':     ['badge-reviewed',   '🟢'],
+};
+const BOARD_CLASS = {
+    'Reviewed':     'board-mini-reviewed',
+    'In Review':    'board-mini-inreview',
+    'BL in Review': 'board-mini-blinreview',
+    'Draft':        'board-mini-draft',
+};
+const DETAIL_URL = "{{ url_for('review.tc_detail', tc_id=0) }}".replace('/0', '/');
+
+function getParams() {
+    return new URLSearchParams({
+        project_id: document.getElementById('f-project').value,
+        status:     document.getElementById('f-status').value,
+        domain:     document.getElementById('f-domain').value,
+        alm_status: document.getElementById('f-alm-status').value,
+        q:          document.getElementById('f-keyword').value,
+        sort:       document.getElementById('f-sort').value,
+        dir:        document.getElementById('f-dir').value,
+    });
+}
+
+function fetchSort(col) {
+    const sortEl = document.getElementById('f-sort');
+    const dirEl  = document.getElementById('f-dir');
+    if (sortEl.value === col) {
+        dirEl.value = dirEl.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortEl.value = col;
+        dirEl.value  = 'asc';
+    }
+    fetchList();
+}
+
+function resetFilter() {
+    document.getElementById('f-project').value    = '';
+    document.getElementById('f-status').value     = '';
+    document.getElementById('f-domain').value     = '';
+    document.getElementById('f-alm-status').value = '';
+    document.getElementById('f-keyword').value    = '';
+    document.getElementById('f-sort').value       = 'tc_id';
+    document.getElementById('f-dir').value        = 'asc';
+    fetchList();
+}
+
+function fetchList() {
+    const tbody = document.getElementById('tc-tbody');
+    if (!tbody) return;
+    tbody.style.opacity = '0.4';
+    fetch('/review/api/list?' + getParams())
+        .then(r => r.json())
+        .then(data => { renderTable(data.tc_list); tbody.style.opacity = '1'; })
+        .catch(() => { tbody.style.opacity = '1'; });
+}
+
+function renderTable(list) {
+    const tbody = document.getElementById('tc-tbody');
+    if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#6E6E73;">데이터가 없습니다.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(tc => {
+        const st  = tc.overall_status || 'Draft';
+        const si  = STATUS_BADGE[st] || ['badge-draft', '⬜'];
+        const tcId = tc.tc_url
+            ? `<a href="${tc.tc_url}" target="_blank" class="tc-id-link" title="Polarion ALM에서 열기">${tc.tc_id}<span style="font-size:9px;"> ↗</span></a>`
+            : `<span class="tc-id-text">${tc.tc_id || '-'}</span>`;
+        const shared = tc.target_project && tc.target_project.includes(',')
+            ? `<span style="font-size:9px;color:#FF9F0A;margin-left:2px;" title="공유 TC: ${tc.target_project}">⚡</span>` : '';
+        const boardBadges = tc.board_statuses.map(bs => {
+            const bc = BOARD_CLASS[bs.status] || 'board-mini-draft';
+            return `<span class="board-mini-badge ${bc}">${bs.board}</span>`;
+        }).join('');
+        const sitlId  = tc.sitl_id ? `<span class="sitl-id">${tc.sitl_id}</span>` : `<span class="text-muted">-</span>`;
+        const almSt   = tc.alm_status
+            ? `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#F2F2F7;color:#6E6E73;border:1px solid #D1D1D6;white-space:nowrap;">${tc.alm_status}</span>`
+            : `<span class="text-muted">-</span>`;
+        return `<tr>
+            <td><span style="font-size:11px;background:#EEF1FB;color:#1428A0;padding:2px 7px;border-radius:6px;font-weight:600;white-space:nowrap;">${tc.project_name || '-'}</span>${shared}</td>
+            <td>${tcId}</td>
+            <td class="text-muted" style="white-space:nowrap;">${tc.sub_system || '-'}</td>
+            <td class="text-muted" style="white-space:nowrap;">${tc.ip || '-'}</td>
+            <td>${sitlId}</td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${tc.title}">${tc.title || '-'}</td>
+            <td class="text-muted" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${tc.domain}">${tc.domain || '-'}</td>
+            <td style="text-align:center;">${almSt}</td>
+            <td style="text-align:center;">
+                <span class="badge ${si[0]}">${si[1]} ${st}</span>
+                ${boardBadges ? `<div class="board-mini-badges" style="justify-content:center;">${boardBadges}</div>` : ''}
+            </td>
+            <td style="text-align:center;"><a href="${DETAIL_URL}${tc.id}" class="btn btn-secondary btn-sm">🔍</a></td>
+        </tr>`;
+    }).join('');
+
+    // 드래그앤드롭 colIdx 재부여
+    document.querySelectorAll('#tc-tbody tr').forEach(row => {
+        Array.from(row.querySelectorAll('td')).forEach((td, i) => { td.dataset.colIdx = i; });
+    });
+}
+</script>
+
 <script>
 (function(){
     const STORE_KEY = 'tc_col_order';
 
     window.addEventListener('DOMContentLoaded', () => {
+        fetchList(); // 최초 데이터 로드
+
         const table = document.querySelector('table');
         if (!table) return;
 
