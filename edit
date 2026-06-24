@@ -54,6 +54,15 @@
     vertical-align: middle;
 }
 .sort-icon.active { color: #1428A0; font-weight:900; }
+
+/* 드래그앤드롭 헤더 */
+.sort-th[draggable] { cursor: grab; }
+.col-ghost   { opacity:0.3; background:#C5CAE9 !important; }
+.col-chosen  { cursor: grabbing; }
+.col-drag    { background:#1428A0 !important; color:#fff !important;
+               opacity:0.85; border-radius:6px; box-shadow:0 4px 16px rgba(20,40,160,0.25); }
+.table-wrap table { visibility: hidden; }
+.table-wrap table.col-ready { visibility: visible; transition: opacity 0.15s ease; }
 </style>
 {% endblock %}
 
@@ -99,11 +108,13 @@
 <div class="card">
     <div class="card-header" style="flex-wrap:wrap;gap:10px;">
         <!-- 필터 -->
-        <div class="filter-bar" style="flex:1;" id="filter-form">
-            <input type="hidden" id="f-sort" value="{{ sort_col }}">
-            <input type="hidden" id="f-dir"  value="{{ sort_dir }}">
+        <form method="GET" class="filter-bar" style="flex:1;" id="filter-form">
+            <!-- 정렬 파라미터 유지 -->
+            <input type="hidden" name="sort" value="{{ sort_col }}">
+            <input type="hidden" name="dir"  value="{{ sort_dir }}">
+            <input type="hidden" name="alm_status" value="{{ alm_status_filter }}">
 
-            <select id="f-project" onchange="fetchList()">
+            <select name="project_id" onchange="this.form.submit()">
                 <option value="">📁 전체 프로젝트</option>
                 {% for p in projects %}
                 <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>
@@ -112,7 +123,8 @@
                 {% endfor %}
             </select>
 
-            <select id="f-alm-status" onchange="fetchList()">
+            <!-- ALM TC 상태 필터 -->
+            <select name="alm_status" onchange="this.form.submit()">
                 <option value="">📌 ALM상태</option>
                 {% for st in alm_status_list %}
                 <option value="{{ st }}" {% if alm_status_filter == st %}selected{% endif %}>
@@ -121,7 +133,7 @@
                 {% endfor %}
             </select>
 
-            <select id="f-status" onchange="fetchList()">
+            <select name="status" onchange="this.form.submit()">
                 <option value="">🔘 리뷰상태</option>
                 {% for st in STATUS_LIST %}
                 <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>
@@ -130,7 +142,7 @@
                 {% endfor %}
             </select>
 
-            <select id="f-domain" onchange="fetchList()">
+            <select name="domain" onchange="this.form.submit()">
                 <option value="">🏷️ Domain</option>
                 {% for d in domain_list %}
                 <option value="{{ d }}" {% if domain_filter == d %}selected{% endif %}>
@@ -138,14 +150,14 @@
                 </option>
                 {% endfor %}
             </select>
-
-            <input type="text" id="f-keyword" value="{{ keyword }}"
+            <input type="text" name="q" value="{{ keyword }}"
                    placeholder="🔍 TC ID / SITL-ID / 제목 / SubSystem 검색"
-                   style="min-width:220px;"
-                   onkeydown="if(event.key==='Enter') fetchList()">
-            <button class="btn btn-primary btn-sm" onclick="fetchList()">검색</button>
-            <button class="btn btn-secondary btn-sm" onclick="resetFilter()">초기화</button>
-        </div>
+                   style="min-width:220px;">
+            <button type="submit" class="btn btn-primary btn-sm">검색</button>
+            {% if keyword or status_filter or selected_project or domain_filter or alm_status_filter %}
+            <a href="{{ url_for('review.list_tc') }}" class="btn btn-secondary btn-sm">초기화</a>
+            {% endif %}
+        </form>
 
         <div style="display:flex;gap:8px;margin-left:auto;">
             {% if session.role == 'admin' %}
@@ -170,38 +182,38 @@
         <table>
             <thead>
                 <tr>
-                    <th class="sort-th" onclick="fetchSort('project_name')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('project_name')|trim }}'">
                         프로젝트{{ sort_icon('project_name') }}
                     </th>
-                    <th class="sort-th" onclick="fetchSort('tc_id')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('tc_id')|trim }}'">
                         TC ID{{ sort_icon('tc_id') }}
                     </th>
-                    <th class="sort-th" onclick="fetchSort('sub_system')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('sub_system')|trim }}'">
                         Sub System{{ sort_icon('sub_system') }}
                     </th>
-                    <th class="sort-th" onclick="fetchSort('ip')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('ip')|trim }}'">
                         IP{{ sort_icon('ip') }}
                     </th>
-                    <th class="sort-th" onclick="fetchSort('sitl_id')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('sitl_id')|trim }}'">
                         SITL-ID{{ sort_icon('sitl_id') }}
                     </th>
-                    <th class="sort-th" onclick="fetchSort('title')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('title')|trim }}'">
                         제목{{ sort_icon('title') }}
                     </th>
-                    <th class="sort-th" onclick="fetchSort('domain')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('domain')|trim }}'">
                         Domain{{ sort_icon('domain') }}
                     </th>
-                    <th class="sort-th" onclick="fetchSort('alm_status')">
+                    <th class="sort-th" onclick="location.href='{{ sort_url('alm_status')|trim }}'">
                         ALM TC 상태{{ sort_icon('alm_status') }}
                     </th>
                     <th class="sort-th" style="text-align:center; min-width:160px;"
-                        onclick="fetchSort('overall_status')">
+                        onclick="location.href='{{ sort_url('overall_status')|trim }}'">
                         전체상태 / 보드별{{ sort_icon('overall_status') }}
                     </th>
                     <th style="text-align:center;">상세</th>
                 </tr>
             </thead>
-            <tbody id="tc-tbody">
+            <tbody>
                 {% for tc in tc_list %}
                 {% set board_statuses = board_status_map.get(tc.id, []) %}
                 <tr>
@@ -334,121 +346,18 @@
 </div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/Sortable.min.js') }}"></script>
-<script>
-// ── 비동기 필터/정렬 ─────────────────────────────
-const STATUS_BADGE = {
-    'Draft':        ['badge-draft',      '⬜'],
-    'In Review':    ['badge-inreview',   '🔵'],
-    'BL in Review': ['badge-blinreview', '🟡'],
-    'Reviewed':     ['badge-reviewed',   '🟢'],
-};
-const BOARD_CLASS = {
-    'Reviewed':     'board-mini-reviewed',
-    'In Review':    'board-mini-inreview',
-    'BL in Review': 'board-mini-blinreview',
-    'Draft':        'board-mini-draft',
-};
-const DETAIL_URL = "{{ url_for('review.tc_detail', tc_id=0) }}".replace('/0', '/');
-
-function getParams() {
-    return new URLSearchParams({
-        project_id: document.getElementById('f-project').value,
-        status:     document.getElementById('f-status').value,
-        domain:     document.getElementById('f-domain').value,
-        alm_status: document.getElementById('f-alm-status').value,
-        q:          document.getElementById('f-keyword').value,
-        sort:       document.getElementById('f-sort').value,
-        dir:        document.getElementById('f-dir').value,
-    });
-}
-
-function fetchSort(col) {
-    const sortEl = document.getElementById('f-sort');
-    const dirEl  = document.getElementById('f-dir');
-    if (sortEl.value === col) {
-        dirEl.value = dirEl.value === 'asc' ? 'desc' : 'asc';
-    } else {
-        sortEl.value = col;
-        dirEl.value  = 'asc';
-    }
-    fetchList();
-}
-
-function resetFilter() {
-    document.getElementById('f-project').value    = '';
-    document.getElementById('f-status').value     = '';
-    document.getElementById('f-domain').value     = '';
-    document.getElementById('f-alm-status').value = '';
-    document.getElementById('f-keyword').value    = '';
-    document.getElementById('f-sort').value       = 'tc_id';
-    document.getElementById('f-dir').value        = 'asc';
-    fetchList();
-}
-
-function fetchList() {
-    const tbody = document.getElementById('tc-tbody');
-    if (!tbody) return;
-    tbody.style.opacity = '0.4';
-    fetch('/review/api/list?' + getParams())
-        .then(r => r.json())
-        .then(data => { renderTable(data.tc_list); tbody.style.opacity = '1'; })
-        .catch(() => { tbody.style.opacity = '1'; });
-}
-
-function renderTable(list) {
-    const tbody = document.getElementById('tc-tbody');
-    if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#6E6E73;">데이터가 없습니다.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = list.map(tc => {
-        const st  = tc.overall_status || 'Draft';
-        const si  = STATUS_BADGE[st] || ['badge-draft', '⬜'];
-        const tcId = tc.tc_url
-            ? `<a href="${tc.tc_url}" target="_blank" class="tc-id-link" title="Polarion ALM에서 열기">${tc.tc_id}<span style="font-size:9px;"> ↗</span></a>`
-            : `<span class="tc-id-text">${tc.tc_id || '-'}</span>`;
-        const shared = tc.target_project && tc.target_project.includes(',')
-            ? `<span style="font-size:9px;color:#FF9F0A;margin-left:2px;" title="공유 TC: ${tc.target_project}">⚡</span>` : '';
-        const boardBadges = tc.board_statuses.map(bs => {
-            const bc = BOARD_CLASS[bs.status] || 'board-mini-draft';
-            return `<span class="board-mini-badge ${bc}">${bs.board}</span>`;
-        }).join('');
-        const sitlId  = tc.sitl_id ? `<span class="sitl-id">${tc.sitl_id}</span>` : `<span class="text-muted">-</span>`;
-        const almSt   = tc.alm_status
-            ? `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#F2F2F7;color:#6E6E73;border:1px solid #D1D1D6;white-space:nowrap;">${tc.alm_status}</span>`
-            : `<span class="text-muted">-</span>`;
-        return `<tr>
-            <td><span style="font-size:11px;background:#EEF1FB;color:#1428A0;padding:2px 7px;border-radius:6px;font-weight:600;white-space:nowrap;">${tc.project_name || '-'}</span>${shared}</td>
-            <td>${tcId}</td>
-            <td class="text-muted" style="white-space:nowrap;">${tc.sub_system || '-'}</td>
-            <td class="text-muted" style="white-space:nowrap;">${tc.ip || '-'}</td>
-            <td>${sitlId}</td>
-            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${tc.title}">${tc.title || '-'}</td>
-            <td class="text-muted" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${tc.domain}">${tc.domain || '-'}</td>
-            <td style="text-align:center;">${almSt}</td>
-            <td style="text-align:center;">
-                <span class="badge ${si[0]}">${si[1]} ${st}</span>
-                ${boardBadges ? `<div class="board-mini-badges" style="justify-content:center;">${boardBadges}</div>` : ''}
-            </td>
-            <td style="text-align:center;"><a href="${DETAIL_URL}${tc.id}" class="btn btn-secondary btn-sm">🔍</a></td>
-        </tr>`;
-    }).join('');
-
-    // 드래그앤드롭 colIdx 재부여
-    document.querySelectorAll('#tc-tbody tr').forEach(row => {
-        Array.from(row.querySelectorAll('td')).forEach((td, i) => { td.dataset.colIdx = i; });
-    });
-}
-</script>
-
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 (function(){
     const STORE_KEY = 'tc_col_order';
 
-    window.addEventListener('DOMContentLoaded', () => {
-        fetchList(); // 최초 데이터 로드
+    function saveOrder(thead) {
+        const order = Array.from(thead.querySelectorAll('th'))
+                           .map(t => parseInt(t.dataset.colIdx));
+        localStorage.setItem(STORE_KEY, JSON.stringify(order));
+    }
 
+    window.addEventListener('DOMContentLoaded', () => {
         const table = document.querySelector('table');
         if (!table) return;
 
@@ -456,13 +365,9 @@ function renderTable(list) {
         const tbody = table.querySelector('tbody');
 
         // th, td 에 원본 인덱스 부여
-        Array.from(thead.querySelectorAll('th')).forEach((th, i) => {
-            th.dataset.colIdx = i;
-        });
+        thead.querySelectorAll('th').forEach((th, i) => { th.dataset.colIdx = i; });
         tbody && tbody.querySelectorAll('tr').forEach(row => {
-            Array.from(row.querySelectorAll('td')).forEach((td, i) => {
-                td.dataset.colIdx = i;
-            });
+            row.querySelectorAll('td').forEach((td, i) => { td.dataset.colIdx = i; });
         });
 
         // 저장된 순서 복원
@@ -489,95 +394,13 @@ function renderTable(list) {
         // 순서 복원 완료 후 테이블 표시
         table.classList.add('col-ready');
 
-        // ── 컬럼 너비 조절 ──────────────────────────────
-        const WIDTH_KEY = 'tc_col_widths';
-
-        // 저장된 너비 복원
-        const savedWidths = localStorage.getItem(WIDTH_KEY);
-        if (savedWidths) {
-            try {
-                const widths = JSON.parse(savedWidths);
-                Array.from(thead.querySelectorAll('th')).forEach((th, i) => {
-                    if (widths[i]) th.style.width = widths[i] + 'px';
-                });
-            } catch(e) { localStorage.removeItem(WIDTH_KEY); }
-        }
-
-        // 각 th에 리사이즈 핸들 추가
-        Array.from(thead.querySelectorAll('th')).forEach((th) => {
-            const handle = document.createElement('div');
-            handle.className = 'resize-handle';
-            th.appendChild(handle);
-
-            let startX, startW;
-
-            handle.addEventListener('mousedown', e => {
-                e.stopPropagation(); // 드래그앤드롭과 충돌 방지
-                e.preventDefault();
-                startX = e.pageX;
-                startW = th.offsetWidth;
-                handle.classList.add('resizing');
-
-                // 드래그 시작 시 td 너비 고정 (변화 방지)
-                table.querySelectorAll('th').forEach(el => {
-                    el.style.transition = 'none';
-                });
-                tbody && tbody.querySelectorAll('tr').forEach(row => {
-                    Array.from(row.querySelectorAll('td')).forEach(td => {
-                        td.style.width = td.offsetWidth + 'px';
-                        td.style.minWidth = td.offsetWidth + 'px';
-                        td.style.maxWidth = td.offsetWidth + 'px';
-                    });
-                });
-
-                const onMove = e => {
-                    const newW = Math.max(50, startW + (e.pageX - startX));
-                    th.style.width = newW + 'px';
-                    th.style.minWidth = newW + 'px';
-                    // td는 드래그 중 건드리지 않음
-                };
-                const onUp = () => {
-                    handle.classList.remove('resizing');
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-
-                    // th transition 다시 켜기
-                    table.querySelectorAll('th').forEach(el => {
-                        el.style.transition = '';
-                    });
-
-                    // td 고정 해제 후 th 너비에 즉시 맞춤
-                    const thList = Array.from(thead.querySelectorAll('th'));
-                    thList.forEach((t, i) => {
-                        const w = t.offsetWidth + 'px';
-                        tbody && tbody.querySelectorAll('tr').forEach(row => {
-                            const td = row.querySelectorAll('td')[i];
-                            if (td) {
-                                td.style.transition = 'none';
-                                td.style.maxWidth = '';
-                                td.style.minWidth = w;
-                                td.style.width = w;
-                                requestAnimationFrame(() => { td.style.transition = ''; });
-                            }
-                        });
-                    });
-
-                    // 너비 저장
-                    const widths = thList.map(t => t.offsetWidth);
-                    localStorage.setItem(WIDTH_KEY, JSON.stringify(widths));
-                };
-                document.addEventListener('mousemove', onMove);
-                document.addEventListener('mouseup', onUp);
-            });
-        });
-
         // SortableJS 적용
         Sortable.create(thead, {
-            animation: 150,          // 이동 애니메이션 속도 (ms)
-            easing: 'cubic-bezier(0.25, 1, 0.5, 1)',  // 물 흐르는 easing
-            ghostClass: 'col-ghost', // 드래그 중 원래 자리 스타일
-            chosenClass: 'col-chosen', // 잡고있는 항목 스타일
-            dragClass: 'col-drag',   // 실제 드래그 중인 항목 스타일
+            animation: 150,
+            easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+            ghostClass: 'col-ghost',
+            chosenClass: 'col-chosen',
+            dragClass: 'col-drag',
             onEnd(evt) {
                 if (evt.oldIndex === evt.newIndex) return;
 
@@ -591,44 +414,11 @@ function renderTable(list) {
                     }
                 });
 
-                // 순서 저장
-                const order = Array.from(thead.querySelectorAll('th'))
-                                   .map(t => parseInt(t.dataset.colIdx));
-                localStorage.setItem(STORE_KEY, JSON.stringify(order));
+                saveOrder(thead);
             }
         });
     });
 })();
 </script>
-<style>
-.col-ghost   { opacity:0.3; background:#C5CAE9 !important; }
-.col-chosen  { cursor: grabbing; }
-.col-drag    { background:#1428A0 !important; color:#fff !important;
-               opacity:0.85; border-radius:6px; box-shadow:0 4px 16px rgba(20,40,160,0.25); }
-.table-wrap table { visibility: hidden; }
-.table-wrap table.col-ready { visibility: visible; transition: opacity 0.15s ease; }
-
-/* 너비 조절 */
-.resize-handle {
-    position: absolute; right: 0; top: 0;
-    width: 6px; height: 100%;
-    cursor: col-resize;
-    user-select: none;
-    z-index: 1;
-}
-.resize-handle:hover, .resize-handle.resizing {
-    background: #1428A0;
-    opacity: 0.5;
-}
-thead tr th {
-    position: relative;
-    transition: width 0.15s ease;
-}
-tbody tr td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-</style>
 
 {% endblock %}
