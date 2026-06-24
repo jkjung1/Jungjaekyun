@@ -412,9 +412,16 @@
                 startW = th.offsetWidth;
                 handle.classList.add('resizing');
 
-                // 드래그 중엔 th transition만 끄기
+                // 드래그 시작 시 td 너비 고정 (변화 방지)
                 table.querySelectorAll('th').forEach(el => {
                     el.style.transition = 'none';
+                });
+                tbody && tbody.querySelectorAll('tr').forEach(row => {
+                    Array.from(row.querySelectorAll('td')).forEach(td => {
+                        td.style.width = td.offsetWidth + 'px';
+                        td.style.minWidth = td.offsetWidth + 'px';
+                        td.style.maxWidth = td.offsetWidth + 'px';
+                    });
                 });
 
                 const onMove = e => {
@@ -433,7 +440,7 @@
                         el.style.transition = '';
                     });
 
-                    // 드롭 후 td 너비를 th에 맞춰 즉시(transition 없이) 반영
+                    // td 고정 해제 후 th 너비에 즉시 맞춤
                     const thList = Array.from(thead.querySelectorAll('th'));
                     thList.forEach((t, i) => {
                         const w = t.offsetWidth + 'px';
@@ -441,9 +448,9 @@
                             const td = row.querySelectorAll('td')[i];
                             if (td) {
                                 td.style.transition = 'none';
-                                td.style.width = w;
+                                td.style.maxWidth = '';
                                 td.style.minWidth = w;
-                                // 한 프레임 뒤 transition 원복
+                                td.style.width = w;
                                 requestAnimationFrame(() => { td.style.transition = ''; });
                             }
                         });
