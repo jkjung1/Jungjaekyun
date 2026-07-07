@@ -20,37 +20,37 @@ class CITestManager:
         self.jobname = jobname.  #'CI_TEST'
         self.buildnum = buildnum #'516362'
         tfs_jenkins = jenkins.Jenkins(self.url, username=username, password=password)
-        self.build_info = tfs_jenkins.get_build_info(jobname, buildname, depth='2')
+        self.build_info = tfs_jenkins.get_build_info(jobname, buildnum, depth='2')
         self.jenkins_param = {}
         self.result_dict = {}
         self.suite_result_dict = {}
-        self.suote = ''
+        self.suite = ''
         print("end of CITestManager_init")
        
     def get_test_info(self):
         # get jenkins parameter
         print("-exe get_test_info")
         build_info_action = [item for item in self.build_info['actions'] if item]
-        action_parameters = next((item['parameter'] for item in build_info_action
+        action_parameters = next((item['parameters'] for item in build_info_action
                                 if item.get('_class') == 'hudson.model.ParametersAction'), None)
         for param in action_parameters:
             self.jenkins_param[param['name']] = param['value']
             
             # test result
-            detail_result = re.split(r'= UW.+ <br>\n', self.build_info['description'].strip())[1].split('<br>\n')
-            for line in detail_result:
-                each = re.split(r'(\w+)\/(.+) : (PASS|FAIL|Disable|NotTested)', line)
-                try:
-                    sitl_number = re.search(r'.*[_-](\d+)\.', each[2])
-                    sitl_number = sitl_number.group(1)
-                except AttributeError:
-                    sitl_number = ""
+        detail_result = re.split(r'= UW.+ <br>\n', self.build_info['description'].strip())[1].split('<br>\n')
+        for line in detail_result:
+            each = re.split(r'(\w+)\/(.+) : (PASS|FAIL|Disable|NotTested)', line)
+            try:
+                sitl_number = re.search(r'.*[_-](\d+)\.', each[2])
+                sitl_number = sitl_number.group(1)
+            except AttributeError:
+                sitl_number = ""
                     
-                suite, tc, result = each[0] + each[1], f'SITL-{sitl_number}', each[3]
-                if suite not in self.result_dict:
-                    self.result_dict[suite] = {}
-                self.suite_result_dict[tc] = result
-                self.result_dict[suite] = self.suite_result_dict
+            suite, tc, result = each[0] + each[1], f'SITL-{sitl_number}', each[3]
+            if suite not in self.result_dict:
+                self.result_dict[suite] = {}
+            self.suite_result_dict[tc] = result
+            self.result_dict[suite] = self.suite_result_dict
                 
     def get_local_project_name(self):
         print("-exe get_local_project_name")
@@ -59,7 +59,7 @@ class CITestManager:
             for suite in jenkins_suites:
                 if self.jenkins_param['TARGET_PROJECT'] in suite:
                     build_project.append(local_project)
-            return list(set(build_project))
+        return list(set(build_project))
     
     def create_csv_directory(self, ir_version, build_number):
         root_dir = 'E:/03.project/tc_manager/RegressionTest_LOG'
@@ -104,12 +104,12 @@ class CITestManager:
                 for suite, tc_result in self.result_dict.items():
                     if jsuite == suite:
                         for tc, result in tc_result.items():
-                            with open(result_csv, 'a', encoding='utf-8') as f:
+                            with open(result_csv, 'a', encoding='utf-8') as f:get_
                                 f.writelines(f"{tc}.{result.capitalize()}.{cur_datetime}.{'0'}.{'0'}.{'autotest'}\n")
                             if result == 'PASS':
                                 auto_log_txt = os.path.join(auto_pass_dir, f"{project}.{tc}.{result}.{cur_datetime}.{'0'}.{'autotest'}.Commlog.txt")
                                 with open(auto_log_txt, 'w', encoding='utf-8') as txtfile:
-                                    txtfile.write(f'{self.url}/job/{self.jobname}/self.buildnum|/\n')
+                                    txtfile.write(f'{self.url}/job/{self.jobname}/{self.buildnum}/\n')
                                     
                                                                      
 if __name__ == '__main__':
@@ -119,11 +119,11 @@ if __name__ == '__main__':
     password = 'test2015!'
     jobname = 'CI_TEST'
     
-    ir_buildnum = re.search(r'(\w+)#(\d+)', sys.argv[1]).  # ex) IR260707#123456
+    ir_buildnum = re.search(r'(\w+)#(\d+)', sys.argv[1])  # ex) IR260707#123456
     ir_version, build_number = ir_buildnum.group(1), ir_buildnum.group(2)
     ci_test = CITestManager(url, username, password, jobname, build_number)
     ci_test.get_test_info()
     
     csv_dir = ci_test.create_csv_directory(ir_version, build_number)
-    ci_test.mane_auto_result_file(csv_dir)
+    ci_test.make_auto_result_file(csv_dir)
     print("—————————————— END ————————————-")
