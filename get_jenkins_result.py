@@ -36,8 +36,8 @@ class CITestManager:
         for param in action_parameters:
             self.jenkins_param[param['name']] = param['value']
             
-            # test result
-        detail_result = re.split(r'= UW.+ <br>\n', self.build_info['description'].strip())[1].split('<br>\n')
+        # test result
+        detail_result = re.split(r'- UW.+ <br>\n', self.build_info['description'].strip())[1].split('<br>\n')
         for line in detail_result:
             each = re.split(r'(\w+)\/(.+) : (PASS|FAIL|Disable|NotTested)', line)
             try:
